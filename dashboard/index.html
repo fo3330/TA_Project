@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Technical Architect 이직 준비 앱</title>
+<style>
+  /*
+    디자인 컨셉: 공항/기차역 스플릿플랩(전광판) 보드.
+    이직 준비 과정을 하나의 "관제판"처럼 보이도록 다크 테마로 고정함.
+
+    docs/·roadmap/·reference/의 내용을 탭으로 모아 하나의 앱처럼 볼 수 있게 구성.
+    데이터(날짜, 체크, AI 활용 기록)는 이 브라우저의 localStorage에 저장됩니다.
+    다른 기기/브라우저로 옮기려면 하단 "백업" 기능으로 내보내기/가져오기 하세요.
+  */
+  :root{
+    --board-plane:   #0d0d0d;
+    --board-surface: #1a1a19;
+    --board-surface-2: #201f1d;
+    --seam:          rgba(255,255,255,0.09);
+    --hairline:      rgba(255,255,255,0.12);
+    --ink:           #f4efe2;
+    --ink-secondary: #c3c2b7;
+    --muted:         #8b8a83;
+    --accent:        #3987e5;
+    --accent-dim:    #244a75;
+    --good:          #0ca30c;
+    --warning:       #fab219;
+    --critical:      #d03b3b;
+    --radius: 3px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--board-plane);
+    color: var(--ink);
+    padding: 32px 20px 64px;
+    line-height: 1.5;
+  }
+  a{ color: var(--accent); }
+  .wrap{ max-width: 980px; margin: 0 auto; }
+
+  /* ---------- Header ---------- */
+  .eyebrow{ font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+  h1{ font-size: 26px; font-weight: 650; margin: 0 0 4px; text-wrap: balance; }
+  h2{ font-size: 17px; font-weight: 650; margin: 0 0 12px; }
+  h3{ font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 22px 0 10px; }
+  .subline{ color: var(--ink-secondary); font-size: 14px; margin: 0 0 20px; }
+  .subline strong{ color: var(--ink); font-variant-numeric: tabular-nums; }
+  p{ color: var(--ink-secondary); }
+
+  /* ---------- Tabs ---------- */
+  .tabs{
+    display: flex; gap: 2px; overflow-x: auto; margin-bottom: 28px;
+    border-bottom: 1px solid var(--hairline); scrollbar-width: thin;
+  }
+  .tab-btn{
+    background: transparent; border: none; color: var(--muted); font: inherit; font-size: 13px;
+    padding: 10px 14px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap;
+  }
+  .tab-btn:hover{ color: var(--ink-secondary); }
+  .tab-btn.active{ color: var(--ink); border-bottom-color: var(--accent); }
+  .tab-btn:focus-visible{ outline: 2px solid var(--accent); outline-offset: -2px; }
+  .tab-panel{ display: none; }
+  .tab-panel.active{ display: block; }
+
+  /* ---------- Alert banner ---------- */
+  #alert-banner{
+    display: none; align-items: flex-start; gap: 10px;
+    background: linear-gradient(0deg, rgba(250,178,25,0.08), rgba(250,178,25,0.08)), var(--board-surface);
+    border: 1px solid rgba(250,178,25,0.45);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 24px;
+    font-size: 14px;
+  }
+  #alert-banner.show{ display: flex; }
+  #alert-banner .icon{ font-size: 18px; line-height: 1.3; }
+  #alert-banner .body b{ color: var(--warning); }
+  #alert-banner ul{ margin: 6px 0 0; padding-left: 18px; }
+
+  /* ---------- Section heading ---------- */
+  .section-head{
+    font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+    margin: 36px 0 12px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  }
+  .section-head:first-child{ margin-top: 0; }
+  .section-head span.hint{ text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--muted); }
+
+  /* ---------- Board grid (stat tiles) ---------- */
+  .board-grid{
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 2px; background: var(--seam); border: 1px solid var(--hairline);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .tile{ background: var(--board-surface); padding: 16px 14px 14px; position: relative; }
+  .tile::after{ content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--seam); }
+  .tile .label{ font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; min-height: 28px; }
+  .tile .value{
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+  }
+  .tile .value.tbd{ color: var(--muted); font-size: 18px; font-weight: 600; }
+  .tile .value.overdue, .tile .value.today{ color: var(--critical); }
+  .tile .value.soon{ color: var(--warning); }
+  .tile .value.upcoming{ color: var(--accent); }
+  .tile .value.elapsed, .tile .value.stat{ color: var(--good); }
+  .tile .date-row{ margin-top: 10px; display: flex; align-items: center; gap: 6px; }
+  .tile .date-row input[type="date"]{
+    color-scheme: dark;
+    background: var(--board-plane);
+    color: var(--ink-secondary);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
+    font: inherit;
+    font-size: 12px;
+    padding: 4px 6px;
+    width: 100%;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  .tile .date-row input[type="date"]:focus-visible{ outline: 2px solid var(--accent); outline-offset: 1px; }
+  .tile .estimate{ margin-top: 6px; font-size: 11px; color: var(--muted); }
+
+  @media (prefers-reduced-motion: no-preference){
+    .value-flip{ animation: flap-in 380ms ease-out; }
+    @keyframes flap-in{
+      from{ opacity: 0.2; transform: translateY(-4px); }
+      to{ opacity: 1; transform: translateY(0); }
+    }
+  }
+
+  /* ---------- Schedule table / generic table ---------- */
+  .table-scroll{ overflow-x: auto; border: 1px solid var(--hairline); border-radius: var(--radius); margin-bottom: 14px; }
+  table{ width: 100%; border-collapse: collapse; min-width: 480px; font-size: 14px; }
+  thead th{
+    text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+    font-weight: 600; padding: 10px 14px; background: var(--board-surface-2); border-bottom: 1px solid var(--hairline);
+    white-space: nowrap;
+  }
+  tbody td{ padding: 10px 14px; border-bottom: 1px solid var(--seam); background: var(--board-surface); vertical-align: top; }
+  tbody tr:last-child td{ border-bottom: none; }
+  td.num{ font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+
+  .pill{
+    display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 3px 9px;
+    border-radius: 999px; border: 1px solid currentColor; white-space: nowrap;
+  }
+  .pill.tbd{ color: var(--muted); }
+  .pill.upcoming{ color: var(--accent); }
+  .pill.soon{ color: var(--warning); }
+  .pill.today, .pill.overdue{ color: var(--critical); }
+  .pill .dot{ width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+
+  /* ---------- Doc content (읽기 전용 탭 공통) ---------- */
+  .card{
+    background: var(--board-surface); border: 1px solid var(--hairline); border-radius: var(--radius);
+    padding: 16px 18px; margin-bottom: 14px;
+  }
+  .card > *:last-child{ margin-bottom: 0; }
+  .card ul, .card ol{ margin: 6px 0; padding-left: 20px; }
+  .card li{ margin-bottom: 4px; }
+  .tag-list{ display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; }
+  .tag{
+    display: inline-block; font-size: 12px; padding: 4px 10px; border-radius: 999px;
+    background: var(--board-surface-2); border: 1px solid var(--hairline); color: var(--ink-secondary);
+  }
+  .callout{
+    border-left: 3px solid var(--accent); background: var(--board-surface-2); border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 12px 14px; font-size: 13.5px; color: var(--ink-secondary); margin-bottom: 14px;
+  }
+  .doc-link-row{ font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+
+  /* ---------- Roadmap checklist / generic checklist ---------- */
+  .month-card{
+    background: var(--board-surface); border: 1px solid var(--hairline); border-radius: var(--radius);
+    padding: 14px 16px; margin-bottom: 10px;
+  }
+  .month-head{ display: grid; grid-template-columns: 190px 1fr 60px; align-items: center; gap: 14px; margin-bottom: 10px; }
+  .month-head .m-label{ font-size: 13px; }
+  .month-head .m-label a{ color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--muted); }
+  .month-head .m-label a:hover{ color: var(--accent); border-color: var(--accent); }
+  .month-head .m-label small{ display:block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .meter-track{ height: 8px; background: var(--accent-dim); border-radius: 999px; overflow: hidden; }
+  .meter-fill{ height: 100%; background: var(--accent); border-radius: 999px; transition: width 350ms ease-out; }
+  .month-head .m-count{
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums;
+    font-size: 13px; color: var(--ink-secondary); text-align: right;
+  }
+  .check-list{ list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .check-list li{ display: flex; align-items: flex-start; gap: 9px; font-size: 13.5px; }
+  .check-list input[type="checkbox"]{
+    appearance: none; width: 16px; height: 16px; margin: 2px 0 0; flex: none;
+    border: 1px solid var(--hairline); border-radius: 3px; background: var(--board-plane);
+    cursor: pointer; position: relative;
+  }
+  .check-list input[type="checkbox"]:checked{ background: var(--good); border-color: var(--good); }
+  .check-list input[type="checkbox"]:checked::after{
+    content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px;
+    border: solid #0d0d0d; border-width: 0 2px 2px 0; transform: rotate(45deg);
+  }
+  .check-list input[type="checkbox"]:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+  .check-list label{ cursor: pointer; color: var(--ink); }
+  .check-list li.done label{ color: var(--muted); text-decoration: line-through; }
+
+  /* ---------- Forms (AI 활용 기록) ---------- */
+  .form-grid{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+  .form-row{ display: flex; flex-direction: column; gap: 6px; }
+  .form-row.full{ grid-column: 1 / -1; }
+  .form-row label{ font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .form-row input[type="text"], .form-row textarea{
+    background: var(--board-plane); color: var(--ink); border: 1px solid var(--hairline); border-radius: var(--radius);
+    padding: 8px 10px; font: inherit; font-size: 13.5px; resize: vertical;
+  }
+  .form-row input[type="text"]:focus-visible, .form-row textarea:focus-visible{ outline: 2px solid var(--accent); outline-offset: 1px; }
+  .ai-row-table input[type="text"]{
+    width: 100%; background: var(--board-plane); color: var(--ink); border: 1px solid var(--hairline);
+    border-radius: var(--radius); padding: 6px 8px; font: inherit; font-size: 13px;
+  }
+  .btn{
+    background: var(--board-surface); color: var(--ink-secondary); border: 1px solid var(--hairline);
+    border-radius: var(--radius); padding: 7px 13px; font-size: 12.5px; cursor: pointer;
+  }
+  .btn:hover{ color: var(--ink); border-color: var(--accent); }
+  .btn.primary{ background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.primary:hover{ background: #2f72c4; }
+  .btn.danger:hover{ color: var(--critical); border-color: var(--critical); }
+  .btn:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+  .row-actions{ text-align: right; }
+
+  footer{ margin-top: 44px; padding-top: 18px; border-top: 1px solid var(--hairline); font-size: 12px; color: var(--muted); }
+  footer p{ margin: 4px 0; color: var(--muted); }
+  .backup-row{ display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  .backup-row button, .backup-row label{
+    background: var(--board-surface); color: var(--ink-secondary); border: 1px solid var(--hairline);
+    border-radius: var(--radius); padding: 6px 12px; font-size: 12px; cursor: pointer;
+  }
+  .backup-row button:hover, .backup-row label:hover{ color: var(--ink); border-color: var(--accent); }
+  .backup-row input[type="file"]{ display: none; }
+  .backup-row button:focus-visible, .backup-row label:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- Popup ---------- */
+  .popup-overlay{ position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 50; }
+  .popup-overlay[hidden]{ display: none; }
+  .popup-card{
+    background: var(--board-surface); border: 1px solid rgba(250,178,25,0.5); border-radius: var(--radius);
+    max-width: 440px; width: 100%; padding: 22px 22px 18px; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .popup-card h2{ margin: 0 0 4px; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+  .popup-card p.desc{ margin: 0 0 14px; font-size: 13px; color: var(--ink-secondary); }
+  .popup-card ul{ margin: 0 0 18px; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .popup-card li{
+    display: flex; justify-content: space-between; align-items: center; font-size: 14px;
+    background: var(--board-plane); border: 1px solid var(--hairline); border-radius: var(--radius); padding: 8px 12px;
+  }
+  .popup-card li .d{ font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .popup-card button{
+    width: 100%; background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
+    padding: 10px 14px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .popup-card button:hover{ background: #2f72c4; }
+  .popup-card button:focus-visible{ outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  /* ---------- Save toast ---------- */
+  #toast{
+    position: fixed; right: 18px; bottom: 18px;
+    background: var(--good); color: #06210a; font-size: 13px; font-weight: 600;
+    padding: 8px 14px; border-radius: 999px; opacity: 0; transform: translateY(6px);
+    transition: opacity 200ms, transform 200ms; pointer-events: none; z-index: 60;
+  }
+  #toast.show{ opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 620px){
+    .form-grid{ grid-template-columns: 1fr; }
+    .month-head{ grid-template-columns: 1fr; row-gap: 8px; }
+    .month-head .m-count{ text-align: left; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">Technical Architect 이직 준비</p>
+  <h1>AI + Cloud 아키텍처 TA 준비 앱</h1>
+  <p class="subline">오늘: <strong id="today-str">—</strong> · 입력·체크한 내용은 이 브라우저에 바로 저장됩니다.</p>
+
+  <nav class="tabs" id="tabs" role="tablist">
+    <button class="tab-btn active" data-tab="home" role="tab">홈</button>
+    <button class="tab-btn" data-tab="roadmap" role="tab">로드맵</button>
+    <button class="tab-btn" data-tab="role" role="tab">직무 정의</button>
+    <button class="tab-btn" data-tab="gap" role="tab">역량 격차</button>
+    <button class="tab-btn" data-tab="career" role="tab">경력 배경</button>
+    <button class="tab-btn" data-tab="resources" role="tab">학습자료</button>
+    <button class="tab-btn" data-tab="ai-usage" role="tab">현재 프로젝트 AI 활용</button>
+  </nav>
+
+  <div id="alert-banner" role="status">
+    <span class="icon">⚠️</span>
+    <div class="body">
+      <b>임박한 목표일이 있습니다.</b>
+      <ul id="alert-list"></ul>
+    </div>
+  </div>
+
+  <!-- ============ 홈 ============ -->
+  <section class="tab-panel active" id="tab-home">
+    <div class="section-head"><span>현재 상태 한눈에 보기</span></div>
+    <div class="board-grid" id="home-grid"></div>
+
+    <h3>목표 요약</h3>
+    <div class="card">
+      <p><strong style="color:var(--ink)">목표 직무</strong> — Technical Architect (AI + Cloud 환경 설계 중심)</p>
+      <p><strong style="color:var(--ink)">학습 기간</strong> — 별도 마감 없음, TA 직종으로 이직할 때까지 지속</p>
+      <p><strong style="color:var(--ink)">현재 상태</strong> — 시스템 엔지니어 5년차 (시스템 운영 3년 + 인프라 구축 사업 2년)</p>
+    </div>
+
+    <h3>핵심 취약점</h3>
+    <div class="card">
+      <ul>
+        <li>Cloud 환경 구조 자체가 생소함 → <a href="#" data-goto="roadmap">로드맵 Phase 1</a></li>
+        <li>AI를 활용한 개발 경험이 초급 수준 → <a href="#" data-goto="roadmap">로드맵 Phase 2</a></li>
+      </ul>
+      <p>상세 분석은 <a href="#" data-goto="gap">역량 격차</a> 탭 참고.</p>
+    </div>
+
+    <h3>바로가기</h3>
+    <div class="card">
+      <p>
+        <a href="#" data-goto="role">직무 정의</a> ·
+        <a href="#" data-goto="career">경력 배경</a> ·
+        <a href="#" data-goto="resources">학습자료</a> ·
+        <a href="#" data-goto="ai-usage">현재 프로젝트 AI 활용 기록</a>
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ 로드맵 ============ -->
+  <section class="tab-panel" id="tab-roadmap">
+    <div class="section-head">
+      <span>학습 경과</span>
+      <span class="hint">시작일은 필요시 직접 수정 가능</span>
+    </div>
+    <div class="board-grid" id="elapsed-grid"></div>
+
+    <div class="section-head">
+      <span>스스로 정한 목표일 D-DAY</span>
+      <span class="hint">이직 시점이 정해져 있지 않으므로, 각자 판단으로 목표일을 입력 · D-7 이내면 상단 배너 + 팝업으로 알림</span>
+    </div>
+    <div class="board-grid" id="board-grid"></div>
+
+    <div class="section-head"><span>목표 일정표</span></div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>목표</th><th>목표일</th><th>상태</th><th>D-DAY</th></tr></thead>
+        <tbody id="schedule-body"></tbody>
+      </table>
+    </div>
+
+    <div class="section-head"><span>Phase별 준비 체크리스트</span><span class="hint">체크하면 바로 저장됩니다</span></div>
+    <div id="roadmap-list"></div>
+  </section>
+
+  <!-- ============ 직무 정의 ============ -->
+  <section class="tab-panel" id="tab-role">
+    <p class="doc-link-row">원본: <a href="../docs/role-definition.md">docs/role-definition.md</a> — 실제 채용공고·현직자 인터뷰로 계속 보강할 초안</p>
+
+    <h3>직무 개요</h3>
+    <div class="card">
+      <p>Technical Architect(TA)는 비즈니스 요구사항을 기술 구조로 변환하고, 시스템 전체의 설계 방향(아키텍처)을 결정·검증·문서화하는 역할. 이 저장소가 목표로 하는 TA는 특히 <strong style="color:var(--ink)">AI 워크로드와 Cloud 인프라를 결합한 설계</strong>에 강점을 둔 포지션.</p>
+    </div>
+
+    <h3>일반적으로 요구되는 역량 (가설 — 검증 필요)</h3>
+    <div class="card">
+      <ul>
+        <li><strong style="color:var(--ink)">Cloud 아키텍처</strong> — IaaS/PaaS/SaaS 구조, 주요 클라우드(AWS/GCP/Azure) 핵심 서비스, 멀티/하이브리드 설계, 비용·가용성·보안 트레이드오프</li>
+        <li><strong style="color:var(--ink)">AI/ML 인프라</strong> — LLM/ML 모델 서빙, GPU 리소스 관리, 벡터DB·RAG 파이프라인, AI 에이전트 아키텍처, MLOps 기초</li>
+        <li><strong style="color:var(--ink)">시스템 설계 일반</strong> — 확장성/가용성/장애복구 설계, IaC, CI/CD, 옵저버빌리티</li>
+        <li><strong style="color:var(--ink)">소프트 스킬</strong> — 이해관계자 커뮤니케이션, 설계 문서화(ADR 등), 의사결정 근거 제시</li>
+      </ul>
+    </div>
+
+    <h3>강점으로 연결되는 지점</h3>
+    <div class="callout">
+      시스템 운영 3년 + 인프라 구축 사업 2년 경험은 Cloud 아키텍처 학습의 기반이 될 수 있음. U2L 트러블슈팅 경험은 이기종 시스템 마이그레이션 설계 역량과 연결. 상세: <a href="#" data-goto="career">경력 배경</a> 탭.
+    </div>
+
+    <h3>검증이 필요한 질문 (추후 리서치)</h3>
+    <div class="card">
+      <ul class="check-list" id="role-question-list"></ul>
+    </div>
+  </section>
+
+  <!-- ============ 역량 격차 ============ -->
+  <section class="tab-panel" id="tab-gap">
+    <p class="doc-link-row">원본: <a href="../docs/skill-gap.md">docs/skill-gap.md</a></p>
+
+    <h3>핵심 취약점</h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>영역</th><th>현재 상태</th><th>목표 상태</th></tr></thead>
+        <tbody>
+          <tr><td>Cloud 환경 구조</td><td>생소함 — 온프레미스 중심, Cloud 아키텍처 경험 없음</td><td>주요 클라우드의 컴퓨트/네트워크/스토리지/IAM 구조를 스스로 설계·설명 가능</td></tr>
+          <tr><td>AI를 활용한 개발</td><td>초급 — AI 앱 개발·배포 경험은 있으나 깊이 부족</td><td>AI 기반 개발 도구·워크플로우를 실무 수준으로 활용, AI 인프라 설계 이해</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>보유 역량</h3>
+    <div class="card">
+      <div class="tag-list">
+        <span class="tag">Linux/Unix (하드웨어 이해)</span>
+        <span class="tag">네트워크 구조 파악</span>
+        <span class="tag">VTL/PTL·서버·스토리지 구조</span>
+        <span class="tag">U2L 전환 트러블슈팅 (초급)</span>
+        <span class="tag">AI 앱 개발·배포 (초급)</span>
+      </div>
+    </div>
+
+    <h3>갭을 어떻게 메울 것인가</h3>
+    <div class="card">
+      <ul>
+        <li>Cloud 갭 → <a href="#" data-goto="roadmap">로드맵 Phase 1</a>에서 단계적으로 학습</li>
+        <li>AI 개발 갭 → <a href="#" data-goto="roadmap">로드맵 Phase 2</a>에서 단계적으로 학습</li>
+        <li>두 영역이 궤도에 오르면 <a href="#" data-goto="roadmap">Phase 3</a>에서 AI+Cloud 결합 프로젝트로 실전 적용</li>
+      </ul>
+      <p style="margin-top:10px;">매월 말 이 내용을 다시 검토하고 현재 상태를 갱신할 것. 격차가 예상보다 크거나 작다면 로드맵 순서·기간 조정.</p>
+    </div>
+  </section>
+
+  <!-- ============ 경력 배경 ============ -->
+  <section class="tab-panel" id="tab-career">
+    <p class="doc-link-row">원본: <a href="../self-intro-draft.md">self-intro-draft.md</a> · <a href="../reference/career-background.md">reference/career-background.md</a></p>
+
+    <h3>경력</h3>
+    <div class="card">
+      <p>시스템 엔지니어, 총 5년 (시스템 운영 3년 + 인프라 구축 사업 2년)</p>
+    </div>
+
+    <h3>실무 역량</h3>
+    <div class="card">
+      <div class="tag-list">
+        <span class="tag">Linux/Unix</span>
+        <span class="tag">네트워크 구조 파악</span>
+        <span class="tag">VTL/PTL·서버·스토리지 구조</span>
+        <span class="tag">AI 앱 개발·배포 (초급)</span>
+        <span class="tag">U2L 전환 트러블슈팅 (초급)</span>
+      </div>
+    </div>
+
+    <h3>학부 전공 (디지털콘텐츠학과, 동신대)</h3>
+    <div class="card">
+      <div class="tag-list">
+        <span class="tag">자료구조</span><span class="tag">컴퓨터구조</span><span class="tag">운영체제</span>
+        <span class="tag">객체지향프로그래밍Ⅰ·Ⅱ</span><span class="tag">데이터베이스이론및실습</span>
+        <span class="tag">유비쿼터스네트워크</span><span class="tag">임베디드시스템</span><span class="tag">컴퓨터그래픽스</span>
+      </div>
+    </div>
+
+    <h3>이 프로젝트(TA 이직)와의 연결점</h3>
+    <div class="card">
+      <ul>
+        <li>온프레미스 인프라·네트워크·스토리지 실무 경험 → Cloud 아키텍처 학습의 기반</li>
+        <li>U2L 트러블슈팅 경험 → 이기종 시스템 마이그레이션/전환 설계 역량과 연결</li>
+        <li>AI 앱 개발·배포 초급 경험 → <a href="#" data-goto="roadmap">Phase 2</a>에서 심화</li>
+      </ul>
+    </div>
+
+    <h3>배우고자 하는 내용 (self-intro-draft.md 기준)</h3>
+    <div class="card">
+      <ul>
+        <li>SW보다 전기·기계·전자 등 하드웨어와 AI가 결합된 기술력</li>
+        <li>AI+시스템 비중의 연구/실무 방향</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ 학습자료 ============ -->
+  <section class="tab-panel" id="tab-resources">
+    <p class="doc-link-row">원본: <a href="../docs/learning-resources.md">docs/learning-resources.md</a> — 새 자료를 찾으면 원본 파일에도 추가</p>
+
+    <h3>Cloud 환경</h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>자료</th><th>종류</th><th>우선순위</th><th>비고</th></tr></thead>
+        <tbody><tr><td colspan="4" style="color:var(--muted)">예: AWS Cloud Practitioner 공식 학습경로 — 벤더 선정 후 채울 것</td></tr></tbody>
+      </table>
+    </div>
+
+    <h3>AI 사용 환경 / AI 활용 개발</h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>자료</th><th>종류</th><th>우선순위</th><th>비고</th></tr></thead>
+        <tbody><tr><td colspan="4" style="color:var(--muted)">예: Claude Code, Cursor 등 AI 코딩 도구 실습</td></tr></tbody>
+      </table>
+    </div>
+
+    <h3>AI를 활용한 TA 직무 학습</h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>자료</th><th>종류</th><th>우선순위</th><th>비고</th></tr></thead>
+        <tbody><tr><td colspan="4" style="color:var(--muted)">예: AI 아키텍처 설계 사례 스터디, RAG/에이전트 아키텍처 자료</td></tr></tbody>
+      </table>
+    </div>
+
+    <h3>자격증 후보 (검토용)</h3>
+    <div class="card">
+      <ul class="check-list" id="cert-list"></ul>
+    </div>
+  </section>
+
+  <!-- ============ 현재 프로젝트 AI 활용 ============ -->
+  <section class="tab-panel" id="tab-ai-usage">
+    <p class="doc-link-row">원본: <a href="../docs/current-project-ai-usage.md">docs/current-project-ai-usage.md</a> — 여기서 입력하면 저장되고, 필요시 원본 파일에도 옮겨 적으세요</p>
+
+    <div class="callout">현재 진행 중인 업무 프로젝트에서 AI를 어떻게 활용하고 있는지 파악되는 대로 아래에 채워나가세요.</div>
+
+    <h3>프로젝트 개요</h3>
+    <div class="card">
+      <div class="form-grid">
+        <div class="form-row">
+          <label for="ai-project-name">프로젝트명</label>
+          <input type="text" id="ai-project-name" placeholder="예: OO 시스템 고도화">
+        </div>
+        <div class="form-row">
+          <label for="ai-project-role">나의 역할</label>
+          <input type="text" id="ai-project-role" placeholder="예: 인프라 담당">
+        </div>
+        <div class="form-row full">
+          <label for="ai-project-purpose">목적/배경</label>
+          <textarea id="ai-project-purpose" rows="2" placeholder="프로젝트의 목적과 배경을 간단히"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <h3>AI 활용 내역</h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>활용 영역</th><th>사용한 AI/도구</th><th>구체적 활용 방식</th><th>성과/배운 점</th><th></th></tr></thead>
+        <tbody id="ai-usage-rows"></tbody>
+      </table>
+    </div>
+    <button class="btn" id="btn-add-ai-row" type="button">+ 행 추가</button>
+
+    <h3 style="margin-top:24px;">TA 직무 관점에서의 연결점</h3>
+    <div class="card">
+      <div class="form-row">
+        <label for="ai-connection">포트폴리오 연결 메모</label>
+        <textarea id="ai-connection" rows="3" placeholder="이 경험을 AI+Cloud 아키텍처 설계 역량으로 어떻게 포트폴리오화할 것인지, 부족했던 부분과 다음에 시도해볼 것"></textarea>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>데이터는 이 브라우저의 localStorage에 저장됩니다. 다른 기기로 옮기거나 백업하려면:</p>
+    <div class="backup-row">
+      <button id="btn-export" type="button">백업 내보내기 (JSON 다운로드)</button>
+      <label for="file-import">백업 가져오기</label>
+      <input id="file-import" type="file" accept="application/json">
+      <button id="btn-reset" type="button">전체 초기화</button>
+    </div>
+    <p style="margin-top:14px;"><a href="../README.md">README</a> · <a href="../roadmap/README.md">로드맵 인덱스</a> · <a href="../reference/source-materials.md">원본 참고자료 색인</a></p>
+  </footer>
+</div>
+
+<div class="popup-overlay" id="popup" hidden>
+  <div class="popup-card" role="dialog" aria-modal="true" aria-labelledby="popup-title">
+    <h2 id="popup-title">⏰ 임박한 목표일 알림</h2>
+    <p class="desc">D-7 이내이거나 이미 지난 목표일이 있습니다.</p>
+    <ul id="popup-list"></ul>
+    <button id="popup-close" type="button">확인</button>
+  </div>
+</div>
+
+<div id="toast">저장됨</div>
+
+<script>
+  const STORAGE_KEY = 'taPlanner.v2';
+
+  /* ============================================================
+     기본값 — 사용자가 입력한 값은 localStorage에 저장되어 이 값을 덮어씁니다.
+     ============================================================ */
+  const DEFAULT_START_DATE = '2026-07-06'; // 이 저장소를 세팅한 날
+
+  const MILESTONE_DEFS = [
+    { id: 'portfolio',   label: '포트폴리오 1차 완성 목표일', estimate: '미정 — 스스로 설정' },
+    { id: 'first-apply', label: '첫 지원 목표일',             estimate: '미정 — 스스로 설정' },
+    { id: 'job-change',  label: '이직 목표일',                estimate: '미정 — 스스로 설정' },
+  ];
+
+  const ROADMAP_DEFS = [
+    { month: 'Phase 1', title: 'Cloud 환경 구조 기초 다지기', file: '../roadmap/phase-1-cloud-foundations.md', items: [
+      '학습 우선 벤더 선정 (AWS / GCP / Azure 중 1개, 근거는 docs/role-definition.md에 기록)',
+      'IaaS/PaaS/SaaS 개념 및 클라우드 공동 책임 모델 학습',
+      '컴퓨트(VM/컨테이너/서버리스) 핵심 서비스 학습',
+      '네트워크(VPC, 서브넷, 로드밸런서, DNS) 핵심 개념 학습',
+      '스토리지(오브젝트/블록/파일) 및 데이터베이스 서비스 개요 학습',
+      'IAM/보안 기초 (권한, 정책, 네트워크 보안그룹)',
+      'IaC 개념 및 Terraform 등 도구 하나 맛보기 실습',
+      '선택한 벤더의 입문 자격증 취득 여부 결정 및 진행',
+    ]},
+    { month: 'Phase 2', title: 'AI를 활용한 개발 역량 강화', file: '../roadmap/phase-2-ai-driven-dev.md', items: [
+      'AI 코딩 도구(Claude Code 등) 매일 실무/사이드 프로젝트에 사용 습관화',
+      'LLM 기본 개념 정리 (토큰, 컨텍스트, 임베딩, 파인튜닝 vs 프롬프팅)',
+      '간단한 AI 애플리케이션 직접 설계·배포 (API 연동 → 배포까지 1개 이상 완주)',
+      'RAG(검색증강생성) 파이프라인 구조 학습 및 미니 실습',
+      'AI 에이전트/멀티에이전트 아키텍처 개념 학습',
+      '모델 서빙/추론 인프라(GPU 리소스, 배치 vs 실시간) 개요 학습',
+      '학습한 내용을 docs/current-project-ai-usage.md와 연결해 실무 사례로 기록',
+    ]},
+    { month: 'Phase 3', title: 'AI+Cloud 결합 실전/포트폴리오', file: '../roadmap/phase-3-portfolio-practice.md', items: [
+      '포트폴리오용 프로젝트 주제 선정 (AI 워크로드를 Cloud 위에 설계·배포하는 형태)',
+      '아키텍처 설계 문서(ADR, 시스템 다이어그램 등) 작성 연습',
+      '선정 프로젝트를 실제로 클라우드에 배포 (비용/가용성/보안 트레이드오프 문서화)',
+      '현재 업무 프로젝트의 AI 활용 경험을 포트폴리오 스토리로 재구성',
+      '포트폴리오/블로그/GitHub 형태로 외부 공개 가능한 산출물 정리',
+      '자격증 취득 진행 (해당 시)',
+    ]},
+    { month: 'Phase 4', title: '이직 준비 및 실행', file: '../roadmap/phase-4-job-transition.md', items: [
+      '목표 회사/업계군 리스트업',
+      '이력서를 TA(AI+Cloud) 직무 기준으로 재작성',
+      '포트폴리오/GitHub 링크 정리 및 이력서에 반영',
+      '실제 채용공고 기준 역량 재점검',
+      '네트워킹 (현직자 커피챗, 커뮤니티 참여 등)',
+      '지원 시작',
+      '면접 대비 (아키텍처 설계 문제풀이, 경력 스토리 정리)',
+    ]},
+  ];
+
+  const ROLE_QUESTIONS = [
+    '실제 채용공고 5~10건 수집·비교 (요구 스킬, 자격증, 경력 연차)',
+    'AWS/GCP/Azure 중 우선 학습할 벤더 선택 근거 마련 (현재 실무 환경, 채용 시장 수요 기준)',
+    '"AI Solutions Architect"류 직무와 전통적 TA의 차이 정리',
+    '목표 회사/업계군 후보 리스트업 (스타트업 vs 대기업 vs 클라우드 벤더)',
+  ];
+
+  const CERT_CANDIDATES = [
+    'AWS Certified Solutions Architect (Associate → Professional)',
+    'Google Cloud Professional Cloud Architect',
+    'Microsoft Azure Solutions Architect Expert',
+    'AI 관련 자격증 후보 조사',
+  ];
+
+  const SOON_WINDOW = 7;
+  const OVERDUE_GRACE = 3;
+
+  /* ---------- 저장소 ---------- */
+  function emptyState(){
+    return {
+      startDate: DEFAULT_START_DATE,
+      dates: {},
+      checks: {},
+      activeTab: 'home',
+      aiUsage: { projectName: '', role: '', purpose: '', connection: '', rows: [] },
+    };
+  }
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return emptyState();
+      const parsed = JSON.parse(raw);
+      const base = emptyState();
+      return {
+        startDate: parsed.startDate || base.startDate,
+        dates: parsed.dates || {},
+        checks: parsed.checks || {},
+        activeTab: parsed.activeTab || base.activeTab,
+        aiUsage: Object.assign({}, base.aiUsage, parsed.aiUsage || {}),
+      };
+    }catch(e){ return emptyState(); }
+  }
+  let state = loadState();
+  function persist(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); showToast(); }
+
+  let toastTimer = null;
+  function showToast(){
+    const t = document.getElementById('toast');
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 1000);
+  }
+
+  /* ---------- 탭 전환 ---------- */
+  function switchTab(id){
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + id));
+    state.activeTab = id;
+    persist();
+  }
+  function setupTabs(){
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    });
+    document.querySelectorAll('[data-goto]').forEach(a => {
+      a.addEventListener('click', (e) => { e.preventDefault(); switchTab(a.dataset.goto); });
+    });
+    switchTab(state.activeTab);
+  }
+
+  /* ---------- 날짜 계산 ---------- */
+  function todayAtMidnight(){ const d = new Date(); d.setHours(0,0,0,0); return d; }
+  function ddayOf(dateStr, today){
+    if(!dateStr) return null;
+    return Math.round((new Date(dateStr + 'T00:00:00') - today) / 86400000);
+  }
+  function statusOf(dday){
+    if(dday === null) return 'tbd';
+    if(dday < 0) return 'overdue';
+    if(dday === 0) return 'today';
+    if(dday <= SOON_WINDOW) return 'soon';
+    return 'upcoming';
+  }
+  function ddayLabel(status, dday){
+    if(status === 'tbd') return '미정';
+    if(status === 'overdue') return `D+${Math.abs(dday)}`;
+    if(status === 'today') return 'D-DAY';
+    return `D-${dday}`;
+  }
+  function statusText(status, dday){
+    switch(status){
+      case 'tbd': return '미정';
+      case 'overdue': return `D+${Math.abs(dday)} 지남`;
+      case 'today': return 'D-DAY';
+      case 'soon': return `D-${dday} 임박`;
+      default: return `D-${dday}`;
+    }
+  }
+  function pillText(status){
+    return { tbd:'미정', upcoming:'예정', soon:'임박', today:'당일', overdue:'지남' }[status];
+  }
+  function formatDate(dateStr){
+    if(!dateStr) return null;
+    const d = new Date(dateStr + 'T00:00:00');
+    const days = ['일','월','화','수','목','금','토'];
+    return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} (${days[d.getDay()]})`;
+  }
+
+  /* ---------- 홈: 요약 stat ---------- */
+  function buildHome(){
+    const grid = document.getElementById('home-grid');
+
+    const elapsedTile = document.createElement('div');
+    elapsedTile.className = 'tile';
+    elapsedTile.innerHTML = `<div class="label">학습 경과일</div><div class="value stat" id="home-elapsed"></div><div class="estimate">시작일: ${state.startDate}</div>`;
+    grid.appendChild(elapsedTile);
+
+    const progressTile = document.createElement('div');
+    progressTile.className = 'tile';
+    progressTile.innerHTML = `<div class="label">전체 로드맵 진행률</div><div class="value stat" id="home-progress"></div><div class="estimate">Phase 1~4 전체 체크 항목 기준</div>`;
+    grid.appendChild(progressTile);
+
+    const nextTile = document.createElement('div');
+    nextTile.className = 'tile';
+    nextTile.innerHTML = `<div class="label">가장 가까운 목표일</div><div class="value" id="home-next"></div><div class="estimate" id="home-next-label"></div>`;
+    grid.appendChild(nextTile);
+  }
+
+  function updateHome(){
+    const today = todayAtMidnight();
+    const start = new Date(state.startDate + 'T00:00:00');
+    const days = Math.max(0, Math.round((today - start) / 86400000));
+    document.getElementById('home-elapsed').textContent = `${days}일째`;
+
+    let totalItems = 0, doneItems = 0;
+    ROADMAP_DEFS.forEach(r => {
+      r.items.forEach((_, idx) => {
+        totalItems++;
+        if(state.checks[`${r.month}__${idx}`]) doneItems++;
+      });
+    });
+    const pct = totalItems ? Math.round((doneItems / totalItems) * 100) : 0;
+    document.getElementById('home-progress').textContent = `${pct}%`;
+
+    let soonest = null;
+    MILESTONE_DEFS.forEach(m => {
+      const dateStr = state.dates[m.id] || null;
+      if(!dateStr) return;
+      const dday = ddayOf(dateStr, today);
+      if(dday === null) return;
+      if(!soonest || dday < soonest.dday) soonest = { dday, label: m.label, dateStr };
+    });
+    const nextEl = document.getElementById('home-next');
+    const nextLabelEl = document.getElementById('home-next-label');
+    if(soonest){
+      const status = statusOf(soonest.dday);
+      nextEl.className = 'value ' + status;
+      nextEl.textContent = ddayLabel(status, soonest.dday);
+      nextLabelEl.textContent = `${soonest.label} · ${formatDate(soonest.dateStr)}`;
+    }else{
+      nextEl.className = 'value tbd';
+      nextEl.textContent = '미정';
+      nextLabelEl.textContent = '로드맵 탭에서 목표일을 입력하세요';
+    }
+  }
+
+  /* ---------- 학습 경과일 (특수 타일) ---------- */
+  function buildElapsed(){
+    const grid = document.getElementById('elapsed-grid');
+    const tile = document.createElement('div');
+    tile.className = 'tile';
+    tile.innerHTML = `
+      <div class="label">학습 경과일</div>
+      <div class="value elapsed" id="elapsed-value"></div>
+      <div class="date-row">
+        <input type="date" aria-label="학습 시작일" id="elapsed-input">
+      </div>
+      <div class="estimate">시작일 기준 경과 일수</div>
+    `;
+    grid.appendChild(tile);
+
+    const input = tile.querySelector('#elapsed-input');
+    input.value = state.startDate;
+    input.addEventListener('change', () => {
+      state.startDate = input.value || DEFAULT_START_DATE;
+      persist();
+      updateElapsed();
+      updateHome();
+    });
+
+    updateElapsed();
+  }
+
+  function updateElapsed(){
+    const today = todayAtMidnight();
+    const start = new Date(state.startDate + 'T00:00:00');
+    const days = Math.max(0, Math.round((today - start) / 86400000));
+    document.getElementById('elapsed-value').textContent = `${days}일째`;
+  }
+
+  /* ---------- 마일스톤 UI ---------- */
+  const milestoneRefs = {};
+  let popupShown = false;
+
+  function buildMilestones(){
+    const grid = document.getElementById('board-grid');
+    const body = document.getElementById('schedule-body');
+
+    MILESTONE_DEFS.forEach(m => {
+      const tile = document.createElement('div');
+      tile.className = 'tile';
+      tile.innerHTML = `
+        <div class="label">${m.label}</div>
+        <div class="value" data-role="value"></div>
+        <div class="date-row">
+          <input type="date" aria-label="${m.label} 날짜" data-id="${m.id}">
+        </div>
+        <div class="estimate" data-role="estimate"></div>
+      `;
+      grid.appendChild(tile);
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${m.label}</td>
+        <td data-role="date"></td>
+        <td data-role="pill"></td>
+        <td class="num" data-role="dday"></td>
+      `;
+      body.appendChild(tr);
+
+      const input = tile.querySelector('input[type="date"]');
+      input.value = state.dates[m.id] || '';
+      input.addEventListener('change', () => {
+        state.dates[m.id] = input.value || null;
+        persist();
+        updateMilestone(m.id);
+        updateAlerts();
+        updateHome();
+      });
+
+      milestoneRefs[m.id] = {
+        def: m,
+        tileValue: tile.querySelector('[data-role="value"]'),
+        tileEstimate: tile.querySelector('[data-role="estimate"]'),
+        input,
+        rowDate: tr.querySelector('[data-role="date"]'),
+        rowPill: tr.querySelector('[data-role="pill"]'),
+        rowDday: tr.querySelector('[data-role="dday"]'),
+      };
+
+      updateMilestone(m.id, { skipAnim: true });
+    });
+  }
+
+  function updateMilestone(id, opts){
+    const ref = milestoneRefs[id];
+    const today = todayAtMidnight();
+    const dateStr = state.dates[id] || null;
+    const dday = ddayOf(dateStr, today);
+    const status = statusOf(dday);
+
+    ref.tileValue.className = 'value ' + status + (opts && opts.skipAnim ? '' : ' value-flip');
+    ref.tileValue.textContent = ddayLabel(status, dday);
+    ref.tileEstimate.textContent = dateStr ? formatDate(dateStr) : ref.def.estimate;
+
+    ref.rowDate.innerHTML = dateStr ? formatDate(dateStr) : `<em style="color:var(--muted)">${ref.def.estimate}</em>`;
+    ref.rowPill.innerHTML = `<span class="pill ${status}"><span class="dot"></span>${pillText(status)}</span>`;
+    ref.rowDday.textContent = status === 'tbd' ? '—' : statusText(status, dday);
+
+    return { dateStr, dday, status };
+  }
+
+  function updateAlerts(){
+    const today = todayAtMidnight();
+    const urgent = [];
+    MILESTONE_DEFS.forEach(m => {
+      const dateStr = state.dates[m.id] || null;
+      if(!dateStr) return;
+      const dday = ddayOf(dateStr, today);
+      const status = statusOf(dday);
+      if(status === 'soon' || status === 'today' || (status === 'overdue' && Math.abs(dday) <= OVERDUE_GRACE)){
+        urgent.push({ label: m.label, text: statusText(status, dday), date: formatDate(dateStr) });
+      }
+    });
+
+    const banner = document.getElementById('alert-banner');
+    const alertList = document.getElementById('alert-list');
+    alertList.innerHTML = '';
+    if(urgent.length){
+      urgent.forEach(u => {
+        const li = document.createElement('li');
+        li.textContent = `${u.label} — ${u.date} (${u.text})`;
+        alertList.appendChild(li);
+      });
+      banner.classList.add('show');
+    }else{
+      banner.classList.remove('show');
+    }
+    return urgent;
+  }
+
+  function maybeShowPopup(urgent){
+    if(popupShown || !urgent.length) return;
+    popupShown = true;
+    const popupList = document.getElementById('popup-list');
+    popupList.innerHTML = '';
+    urgent.forEach(u => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span>${u.label}</span><span class="d">${u.text}</span>`;
+      popupList.appendChild(li);
+    });
+    document.getElementById('popup').hidden = false;
+  }
+
+  /* ---------- 로드맵 체크리스트 UI ---------- */
+  const monthRefs = {};
+
+  function buildRoadmap(){
+    const container = document.getElementById('roadmap-list');
+    ROADMAP_DEFS.forEach(r => {
+      const card = document.createElement('div');
+      card.className = 'month-card';
+      card.innerHTML = `
+        <div class="month-head">
+          <div class="m-label"><a href="${r.file}">${r.month}</a><small>${r.title}</small></div>
+          <div class="meter-track"><div class="meter-fill" data-role="fill" style="width:0%"></div></div>
+          <div class="m-count" data-role="count">0/${r.items.length}</div>
+        </div>
+        <ul class="check-list"></ul>
+      `;
+      const list = card.querySelector('.check-list');
+      r.items.forEach((text, idx) => {
+        const key = `${r.month}__${idx}`;
+        const li = document.createElement('li');
+        const checked = !!state.checks[key];
+        if(checked) li.classList.add('done');
+        li.innerHTML = `<input type="checkbox" id="chk-${key}" ${checked ? 'checked' : ''}><label for="chk-${key}">${text}</label>`;
+        list.appendChild(li);
+        const checkbox = li.querySelector('input');
+        checkbox.addEventListener('change', () => {
+          state.checks[key] = checkbox.checked;
+          li.classList.toggle('done', checkbox.checked);
+          persist();
+          updateMonthProgress(r.month);
+          updateHome();
+        });
+      });
+      container.appendChild(card);
+
+      monthRefs[r.month] = {
+        def: r,
+        fill: card.querySelector('[data-role="fill"]'),
+        count: card.querySelector('[data-role="count"]'),
+      };
+      updateMonthProgress(r.month);
+    });
+  }
+
+  function updateMonthProgress(month){
+    const ref = monthRefs[month];
+    const total = ref.def.items.length;
+    let done = 0;
+    ref.def.items.forEach((_, idx) => { if(state.checks[`${month}__${idx}`]) done++; });
+    ref.fill.style.width = total ? `${Math.round((done / total) * 100)}%` : '0%';
+    ref.count.textContent = `${done}/${total}`;
+  }
+
+  /* ---------- 일반 체크리스트 (직무정의 질문 / 자격증 후보) ---------- */
+  function buildSimpleChecklist(containerId, keyPrefix, items){
+    const list = document.getElementById(containerId);
+    items.forEach((text, idx) => {
+      const key = `${keyPrefix}__${idx}`;
+      const li = document.createElement('li');
+      const checked = !!state.checks[key];
+      if(checked) li.classList.add('done');
+      li.innerHTML = `<input type="checkbox" id="chk-${key}" ${checked ? 'checked' : ''}><label for="chk-${key}">${text}</label>`;
+      list.appendChild(li);
+      const checkbox = li.querySelector('input');
+      checkbox.addEventListener('change', () => {
+        state.checks[key] = checkbox.checked;
+        li.classList.toggle('done', checkbox.checked);
+        persist();
+      });
+    });
+  }
+
+  /* ---------- 현재 프로젝트 AI 활용 폼 ---------- */
+  function buildAiUsageForm(){
+    const nameInput = document.getElementById('ai-project-name');
+    const roleInput = document.getElementById('ai-project-role');
+    const purposeInput = document.getElementById('ai-project-purpose');
+    const connectionInput = document.getElementById('ai-connection');
+
+    nameInput.value = state.aiUsage.projectName || '';
+    roleInput.value = state.aiUsage.role || '';
+    purposeInput.value = state.aiUsage.purpose || '';
+    connectionInput.value = state.aiUsage.connection || '';
+
+    nameInput.addEventListener('input', () => { state.aiUsage.projectName = nameInput.value; persist(); });
+    roleInput.addEventListener('input', () => { state.aiUsage.role = roleInput.value; persist(); });
+    purposeInput.addEventListener('input', () => { state.aiUsage.purpose = purposeInput.value; persist(); });
+    connectionInput.addEventListener('input', () => { state.aiUsage.connection = connectionInput.value; persist(); });
+
+    renderAiRows();
+    document.getElementById('btn-add-ai-row').addEventListener('click', () => {
+      state.aiUsage.rows.push({ area: '', tool: '', method: '', outcome: '' });
+      persist();
+      renderAiRows();
+    });
+  }
+
+  function renderAiRows(){
+    const tbody = document.getElementById('ai-usage-rows');
+    tbody.innerHTML = '';
+    if(!state.aiUsage.rows.length){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="5" style="color:var(--muted)">아직 입력된 항목이 없습니다. "행 추가"로 시작하세요.</td>`;
+      tbody.appendChild(tr);
+      return;
+    }
+    state.aiUsage.rows.forEach((row, idx) => {
+      const tr = document.createElement('tr');
+      tr.className = 'ai-row-table';
+      tr.innerHTML = `
+        <td><input type="text" data-field="area" value="${escapeAttr(row.area)}" placeholder="예: 코드 리뷰"></td>
+        <td><input type="text" data-field="tool" value="${escapeAttr(row.tool)}" placeholder="예: Claude Code"></td>
+        <td><input type="text" data-field="method" value="${escapeAttr(row.method)}" placeholder="구체적 활용 방식"></td>
+        <td><input type="text" data-field="outcome" value="${escapeAttr(row.outcome)}" placeholder="성과/배운 점"></td>
+        <td class="row-actions"><button class="btn danger" data-role="remove" type="button">삭제</button></td>
+      `;
+      tr.querySelectorAll('input').forEach(inp => {
+        inp.addEventListener('input', () => {
+          state.aiUsage.rows[idx][inp.dataset.field] = inp.value;
+          persist();
+        });
+      });
+      tr.querySelector('[data-role="remove"]').addEventListener('click', () => {
+        state.aiUsage.rows.splice(idx, 1);
+        persist();
+        renderAiRows();
+      });
+      tbody.appendChild(tr);
+    });
+  }
+
+  function escapeAttr(str){
+    return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  }
+
+  /* ---------- 백업 / 초기화 ---------- */
+  function setupBackup(){
+    document.getElementById('btn-export').addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `ta-planner-backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    document.getElementById('file-import').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try{
+          const parsed = JSON.parse(reader.result);
+          const base = emptyState();
+          state = {
+            startDate: parsed.startDate || base.startDate,
+            dates: parsed.dates || {},
+            checks: parsed.checks || {},
+            activeTab: parsed.activeTab || base.activeTab,
+            aiUsage: Object.assign({}, base.aiUsage, parsed.aiUsage || {}),
+          };
+          persist();
+          location.reload();
+        }catch(err){ alert('백업 파일을 읽을 수 없습니다. JSON 형식을 확인하세요.'); }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      if(confirm('입력한 날짜, 체크리스트, AI 활용 기록을 모두 지우고 초기화할까요?')){
+        localStorage.removeItem(STORAGE_KEY);
+        location.reload();
+      }
+    });
+  }
+
+  /* ---------- 초기화 ---------- */
+  function init(){
+    const today = todayAtMidnight();
+    document.getElementById('today-str').textContent = `${today.getFullYear()}년 ${today.getMonth()+1}월 ${today.getDate()}일`;
+
+    setupTabs();
+    buildHome();
+    buildElapsed();
+    buildMilestones();
+    buildRoadmap();
+    buildSimpleChecklist('role-question-list', 'role-q', ROLE_QUESTIONS);
+    buildSimpleChecklist('cert-list', 'cert', CERT_CANDIDATES);
+    buildAiUsageForm();
+    setupBackup();
+
+    updateHome();
+    const urgent = updateAlerts();
+    maybeShowPopup(urgent);
+
+    document.getElementById('popup-close').addEventListener('click', () => {
+      document.getElementById('popup').hidden = true;
+    });
+  }
+
+  init();
+</script>
+</body>
+</html>
