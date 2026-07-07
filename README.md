@@ -1,14 +1,15 @@
-# Technical Architect 이직 로드맵 & 학습관리
+# Technical Architect / Solutions Architect 이직 로드맵 & 학습관리
 
-AI 및 Cloud 환경 설계를 중심으로 하는 **Technical Architect(TA)** 직무로 이직하기 위한 개인 준비 저장소입니다.
+AI 및 Cloud 환경 설계를 중심으로 하는 **Technical Architect(TA)** 및 **Solutions Architect(SA)** 직무로 이직하기 위한 개인 준비 저장소입니다. 두 직무는 요구 기술 스택이 70~80% 이상 겹치는 것으로 확인되어(→ [docs/role-definition.md](docs/role-definition.md) §2) 함께 준비합니다.
 문서 기반으로 학습 로드맵, 주간 기록, 역량 격차, 참고자료를 한 곳에서 관리합니다.
 
 ## 목표 요약
 
-- **목표 직무**: Technical Architect (AI + Cloud 환경 설계 중심)
-- **학습 기간**: 별도 마감 없음 — **TA 직종으로 이직할 때까지** 지속
+- **목표 직무**: Technical Architect **및** Solutions Architect (AI + Cloud 환경 설계 중심, 두 직무 모두 지원 대상)
+- **학습 기간**: 별도 마감 없음 — **TA/SA 직종으로 이직할 때까지** 지속
 - **현재 상태**: 시스템 엔지니어 5년차 (시스템 운영 3년 + 인프라 구축 사업 2년)
 - **핵심 취약점**: (1) Cloud 환경 구조 자체가 생소함 (2) AI를 활용한 개발 경험이 초급 수준 — 상세는 [docs/skill-gap.md](docs/skill-gap.md)
+- **TA vs SA 차이**: 기술 스택은 거의 동일, 방향성만 다름(TA=구현 중심, SA=고객/비즈니스 중심) — 상세는 [docs/role-definition.md](docs/role-definition.md) §2
 - **경력/배경**: [self-intro-draft.md](self-intro-draft.md), 요약은 [reference/career-background.md](reference/career-background.md) 참고
 
 ## 폴더 구조

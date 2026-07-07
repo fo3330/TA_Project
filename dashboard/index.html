@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Technical Architect 이직 준비 앱</title>
+<title>Technical Architect / Solutions Architect 이직 준비 앱</title>
 <style>
   /*
     디자인 컨셉: 공항/기차역 스플릿플랩(전광판) 보드.
@@ -297,8 +297,8 @@
 <body>
 <div class="wrap">
 
-  <p class="eyebrow">Technical Architect 이직 준비</p>
-  <h1>AI + Cloud 아키텍처 TA 준비 앱</h1>
+  <p class="eyebrow">Technical Architect / Solutions Architect 이직 준비</p>
+  <h1>AI + Cloud 아키텍처 TA·SA 준비 앱</h1>
   <p class="subline">오늘: <strong id="today-str">—</strong> · 입력·체크한 내용은 이 브라우저에 바로 저장됩니다.</p>
 
   <nav class="tabs" id="tabs" role="tablist">
@@ -327,8 +327,8 @@
 
     <h3>목표 요약</h3>
     <div class="card">
-      <p><strong style="color:var(--ink)">목표 직무</strong> — Technical Architect (AI + Cloud 환경 설계 중심)</p>
-      <p><strong style="color:var(--ink)">학습 기간</strong> — 별도 마감 없음, TA 직종으로 이직할 때까지 지속</p>
+      <p><strong style="color:var(--ink)">목표 직무</strong> — Technical Architect <strong style="color:var(--ink)">및</strong> Solutions Architect (AI + Cloud 환경 설계 중심, 두 직무 모두 지원 대상 — <a href="#" data-goto="role">차이점 보기</a>)</p>
+      <p><strong style="color:var(--ink)">학습 기간</strong> — 별도 마감 없음, TA/SA 직종으로 이직할 때까지 지속</p>
       <p><strong style="color:var(--ink)">현재 상태</strong> — 시스템 엔지니어 5년차 (시스템 운영 3년 + 인프라 구축 사업 2년)</p>
     </div>
 
@@ -386,7 +386,24 @@
     <h3>직무 개요</h3>
     <div class="card">
       <p>온프레미스 조직은 전통적으로 Technical Architect(인프라)·Solutions Architect(소프트웨어)·Data/Network/Security Architect로 역할이 나뉘는 경우가 많지만, AWS 같은 클라우드 네이티브 조직은 이 역할들을 <strong style="color:var(--ink)">"Solutions Architect"</strong> 한 타이틀로 통합해 부르는 경향이 있음.</p>
-      <p>이 저장소가 목표로 하는 TA는 국내 채용시장에서 실제 쓰이는 <strong style="color:var(--ink)">"테크니컬 아키텍트"</strong>(대규모 시스템 아키텍처 총괄, 안정성·성능·확장성 책임)와 <strong style="color:var(--ink)">"AI/클라우드 아키텍트"</strong>(AI/ML 설계·운영, 클라우드 하이브리드 아키텍처)가 합쳐진 하이브리드 포지션에 가까움.</p>
+      <p>이 저장소는 원래 <strong style="color:var(--ink)">"테크니컬 아키텍트"</strong>(대규모 시스템 아키텍처 총괄, 안정성·성능·확장성 책임)와 <strong style="color:var(--ink)">"AI/클라우드 아키텍트"</strong>가 합쳐진 하이브리드 포지션을 목표로 시작했으나, 2026-07 리서치 결과 TA·SA 기술 스택이 70~80% 이상 겹치는 것으로 확인되어 <strong style="color:var(--ink)">두 트랙을 함께 준비</strong>하는 것으로 범위를 넓힘.</p>
+    </div>
+
+    <h3>TA vs SA — 무엇이 다른가</h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th></th><th>Technical Architect</th><th>Solutions Architect</th></tr></thead>
+        <tbody>
+          <tr><td>시선 방향</td><td>내부(구현) 중심</td><td>외부(고객/비즈니스) 중심</td></tr>
+          <tr><td>역할</td><td>시스템 구성 설계·구현 (EC2 구축, 오토스케일링, Redis 캐시, WAF 등)</td><td>비즈니스 요구에 맞는 솔루션 제안, PoC·데모 리딩, 영업 조직과 협업</td></tr>
+          <tr><td>깊이 vs 넓이</td><td>특정 기술을 깊게</td><td>비즈니스 이해 비중이 큼, 여러 솔루션 조합</td></tr>
+          <tr><td>국내 소속 관례</td><td>개발팀/구축팀과 밀착</td><td>세일즈 조직 산하인 경우 많음 (프리세일즈 성격)</td></tr>
+          <tr><td>산출물</td><td>구현 표준, 시스템 구성</td><td>제안서, 데모, 아키텍처 옵션 비교</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      기술 스킬셋은 <strong style="color:var(--ink)">70~80% 이상 겹침</strong> — 다른 건 "누구를 보고 일하느냐"뿐. Phase 1~3 로드맵은 TA·SA 어느 쪽이든 그대로 유효하고, SA 쪽에 무게를 두려면 <a href="#" data-goto="roadmap">Phase 4</a>에서 고객 커뮤니케이션·PoC/데모 리딩만 추가로 연습하면 됨.
     </div>
 
     <h3>실제 채용공고 기반 요구 역량 — 국내</h3>
@@ -395,6 +412,7 @@
         <li><strong style="color:var(--ink)">테크니컬 아키텍트</strong>(금융권 SI 등) — 계정계·채널계 포함 전사 IT 구조 최적화, 표준 아키텍처 원칙 수립, 클라우드·분산처리·보안 프레임워크 등 신기술 검증·도입</li>
         <li><strong style="color:var(--ink)">AI 클라우드 아키텍트</strong> — AI/ML 분석 모델 설계·구현·운영 경험, 클라우드 기반 AI/ML 분석 경험 3년 이상, 산업공학·컴퓨터공학·전기전자·수학·통계 등 유관 전공 우대</li>
         <li><strong style="color:var(--ink)">클라우드 아키텍트</strong>(대기업) — IaaS/PaaS/SaaS + On-Premise 하이브리드 아키텍처 구축, 빅데이터(분산처리·데이터레이크·AI) 구성, 대규모 트래픽·고가용성(HA) 설계·운영</li>
+        <li><strong style="color:var(--ink)">솔루션 아키텍트(SA)</strong> — 고객 비즈니스 요구사항 분석·솔루션 제안, PoC/데모 리딩, 프리세일즈 지원</li>
       </ul>
     </div>
 
@@ -408,10 +426,15 @@
 
     <h3>요구 기술 스택 정리</h3>
     <div class="card">
+      <p style="margin-top:0; font-size:12px; color:var(--muted);">TA·SA 공통</p>
       <div class="tag-list">
         <span class="tag">AWS/Azure/GCP 멀티클라우드</span><span class="tag">Python</span><span class="tag">Terraform/IaC</span>
         <span class="tag">Docker/Kubernetes</span><span class="tag">네트워킹</span><span class="tag">보안</span>
         <span class="tag">데이터 파이프라인</span><span class="tag">모델 서빙/배포</span><span class="tag">RAG</span><span class="tag">MLOps 기초</span>
+      </div>
+      <p style="font-size:12px; color:var(--muted);">SA 특화 차별점</p>
+      <div class="tag-list">
+        <span class="tag">고객 프레젠테이션·데모 리딩</span><span class="tag">PoC 기획·진행</span><span class="tag">제안서 작성</span><span class="tag">프리세일즈 커뮤니케이션</span>
       </div>
     </div>
 
@@ -440,6 +463,8 @@
         <li><a href="https://www.coursera.org/articles/cloud-architect" target="_blank" rel="noopener">Coursera — Cloud Architect Career Guide</a></li>
         <li><a href="https://www.coursera.org/articles/ai-architect" target="_blank" rel="noopener">Coursera — What Is an AI Architect?</a></li>
         <li><a href="https://medium.com/ai-ml-genai-solution-architecture/what-is-the-role-of-an-ai-solutions-architect-in-2025-a417446a3d8f" target="_blank" rel="noopener">Medium — What is the role of an AI Solutions Architect?</a></li>
+        <li><a href="https://www.indeed.com/career-advice/finding-a-job/solution-architect-vs-technical-architect" target="_blank" rel="noopener">Indeed — Solution Architect vs. Technical Architect</a></li>
+        <li><a href="https://www.elancer.co.kr/blog/detail/829" target="_blank" rel="noopener">이랜서 블로그 — TA, DA, QA, BA, SA 역할별 차이</a></li>
       </ul>
       <p><strong style="color:var(--ink)">자격증 공식 페이지</strong></p>
       <ul>
@@ -797,14 +822,17 @@
       { text: '지원 시작', resource: '' },
       { text: '면접 대비 (아키텍처 설계 문제풀이, 경력 스토리 정리)',
         resource: '책: 『System Design Interview』(Alex Xu) · 방법: 경력 스토리는 STAR 기법으로 정리' },
+      { text: 'SA 지원 시 특화 역량 보강 (고객 커뮤니케이션, PoC/데모 리딩, 프레젠테이션)',
+        resource: '방법: Phase 3 포트폴리오 프로젝트를 5~10분 데모 발표하듯 리허설, 비개발자에게 설명하는 연습' },
     ]},
   ];
 
   const ROLE_QUESTIONS = [
     '실제 채용공고 5~10건을 직접 수집해 요구 스킬·자격증·경력 연차를 표로 정리 (1차 리서치는 시작점일 뿐, 목표 회사군이 정해지면 재조사)',
     'AWS/GCP/Azure 중 우선 학습할 벤더 선택 근거 마련 (국내는 AWS/네이버클라우드 비중이 높은 편 — 실제 통계로 재확인 필요)',
-    '"AI Solutions Architect"류 직무와 전통적 TA의 차이를 목표 회사 기준으로 재정리',
-    '목표 회사/업계군 후보 리스트업 (스타트업 vs 대기업 vs 클라우드 벤더 vs 금융권 SI)',
+    '(완료 2026-07-07) "AI Solutions Architect"류 직무와 전통적 TA의 차이 — 기술스택 70~80% 겹침, 방향성(구현 vs 고객)만 다름으로 정리, TA/SA 병행 준비로 결정',
+    '목표 회사/업계군 후보 리스트업 (스타트업 vs 대기업 vs 클라우드 벤더 vs 금융권 SI, TA·SA 포지션 모두 포함)',
+    'SA 병행 준비 시 포트폴리오/자기소개서에 "고객 커뮤니케이션·PoC 리딩" 사례를 어떻게 넣을지 결정',
   ];
 
   const CERT_CANDIDATES = [
